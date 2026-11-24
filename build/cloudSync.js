@@ -1,9 +1,9 @@
+import { countPending } from "./apply";
 import { runCycle } from "./cycle";
 import { beginFirstSync, deleteMeta, getMeta, setMeta } from "./install";
 const WRITE_POLL_MS = 2_000;
 const RETRY_FIRST_MS = 30_000;
 const RETRY_MAX_MS = 15 * 60_000;
-const countPending = async (db) => (await db.getFirstAsync("SELECT COUNT(*) AS count FROM _sync_changes"))?.count ?? 0;
 /**
  * The sync for one database. Without a transport (a platform not built yet) it only reports `unavailable`.
  * Call `installSync` before creating it.
@@ -102,8 +102,6 @@ export function createCloudSyncWith(db, config, transport, env = {}) {
                     }
                 }));
             }
-            if (env.onRemoteNotification)
-                unsubscribers.push(env.onRemoteNotification(() => void syncNow()));
             if (!appState || appState.current() === "active")
                 startTimers();
             void syncNow();

@@ -73,6 +73,51 @@ export interface Transport {
   signOut?(): Promise<void>;
 }
 
+/** iOS: what CKSyncEngine reports about one record it tried to save. */
+export type EngineSaveResult = { table: string; id: string } & (
+  | { result: "saved"; sys: string; updatedAt: number }
+  | { result: "conflict"; server: SyncRecord }
+  | { result: "failed"; reason: "quota" | "other"; message?: string }
+);
+
+/** iOS: CKSyncEngine's events as the native module forwards them, in order. */
+export type EngineEvent =
+  /** The engine's serialized `State` changed: persist it (it replaces the cursor on iOS). */
+  | { type: "stateUpdate"; state: string }
+  /** `fetchedRecordZoneChanges`: records another device saved. */
+  | { type: "fetched"; records: SyncRecord[] }
+  /** `sentRecordZoneChanges`: what happened to the records handed over with `enqueue`. Transient errors never show up here. */
+  | { type: "sent"; results: EngineSaveResult[] }
+  /** `fetchedDatabaseChanges` deleted the zone (user deleted iCloud data, reset): native recreates it, JS re-sends everything. */
+  | { type: "zoneDeleted" }
+  /** `accountChange`: sign in, sign out or another account. */
+  | { type: "accountChange" }
+  /** A failure that belongs to no record (saving the zone). */
+  | { type: "error"; reason: "quota" | "other"; message?: string }
+  /** `willFetchChanges` / `willSendChanges`. */
+  | { type: "willSync" }
+  /** `didFetchChanges` / `didSendChanges`. */
+  | { type: "didSync" };
+
+/**
+ * iOS: the native CKSyncEngine host. It owns scheduling, change tokens, retries and push; JS owns the database,
+ * the merge and the engine's persisted state. Implemented by `native.ts` and by a fake in tests.
+ */
+export interface SyncEngine {
+  account(): Promise<Account>;
+  /** Creates the engine from its persisted state (null: a first sync) with the dirty rows already pending. */
+  start(state: string | null, pending: SyncRecord[]): Promise<void>;
+  /** Hands over rows to save: native keeps their payloads, so building a batch never waits on JS. */
+  enqueue(records: SyncRecord[]): Promise<void>;
+  /** Fetch, then send, now. */
+  sync(): Promise<void>;
+  /** Cancels and drops the engine; its last persisted state stays with JS. */
+  stop(): Promise<void>;
+  /** Delete the cloud copy (the zone). */
+  wipe(): Promise<void>;
+  addListener(listener: (event: EngineEvent) => void): () => void;
+}
+
 export interface CloudSync {
   /** AppState listener, the write timer, the remote-notification listener. */
   start(): void;

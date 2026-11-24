@@ -1,9 +1,10 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 import { AppState, Platform, Settings } from "react-native";
 
-import { createCloudSyncWith } from "./cloudSync";
+import { createCloudSyncWith, type SyncEnvironment } from "./cloudSync";
+import { createEngineSyncWith } from "./engineSync";
 import { installSyncWith } from "./install";
-import { getDeviceIdAsync } from "./native";
+import { getDeviceIdAsync, nativeSyncEngine } from "./native";
 import { createMemoryCloud, memoryTransport } from "./testing/memoryTransport";
 import type { CloudSync, SyncConfig, Transport } from "./types";
 
@@ -21,19 +22,17 @@ const isMockLaunch = () => Platform.OS === "ios" && isFlagOn(Settings.get(CLOUD_
 
 let mockCloud: ReturnType<typeof createMemoryCloud> | undefined;
 
-/** The platform's transport: CloudKit (ticket M4) and Google Drive (ticket M5) are not built yet. */
-const platformTransport = (): Transport | undefined => {
-  if (isMockLaunch()) return memoryTransport((mockCloud ??= createMemoryCloud()));
-  return undefined;
-};
-
 /** Creates the _sync tables and triggers and runs restore detection. Call after migrate(), before the first read. */
 export async function installSync(db: SQLiteDatabase, config: SyncConfig, options: { deviceId?: string } = {}) {
   await installSyncWith(db, config, options.deviceId ?? (await getDeviceIdAsync()));
 }
 
+/**
+ * The sync for one database: CKSyncEngine on iOS, the pull/push cycle over `transport` otherwise (the memory
+ * cloud with `-cloudSyncMock` or a passed transport; Google Drive lands with ticket M5).
+ */
 export function createCloudSync(db: SQLiteDatabase, config: SyncConfig, transport?: Transport): CloudSync {
-  return createCloudSyncWith(db, config, transport ?? platformTransport(), {
+  const env: SyncEnvironment = {
     appState: {
       current: () => String(AppState.currentState),
       listen: (listener) => {
@@ -42,5 +41,8 @@ export function createCloudSync(db: SQLiteDatabase, config: SyncConfig, transpor
       },
     },
     foregroundPollMs: Platform.OS === "android" ? 60_000 : undefined,
-  });
+  };
+  if (isMockLaunch()) transport ??= memoryTransport((mockCloud ??= createMemoryCloud()));
+  if (!transport && Platform.OS === "ios") return createEngineSyncWith(db, config, nativeSyncEngine(), env);
+  return createCloudSyncWith(db, config, transport, env);
 }

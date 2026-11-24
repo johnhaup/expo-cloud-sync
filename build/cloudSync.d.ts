@@ -1,13 +1,11 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 import type { CloudSync, SyncConfig, Transport } from "./types";
-/** What the sync needs from the platform; `index.ts` wires React Native's AppState, tests pass fakes. */
+/** What the sync needs from the platform; `create.ts` wires React Native's AppState, tests pass fakes. */
 export type SyncEnvironment = {
     appState?: {
         current: () => string;
         listen: (listener: (state: string) => void) => () => void;
     };
-    /** iOS: CloudKit's silent push (ticket M4). */
-    onRemoteNotification?: (listener: () => void) => () => void;
     /** How often to look for local writes while active. */
     writePollMs?: number;
     /** A periodic cycle while active (Android has no push). */

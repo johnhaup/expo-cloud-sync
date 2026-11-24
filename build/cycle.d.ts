@@ -17,7 +17,7 @@ export type CycleResult = {
     error?: string;
 };
 /**
- * One sync cycle: check the account, pull every page and merge it, push the dirty set.
- * Never throws for a cloud error; the result carries the state to show.
+ * One sync cycle (Android, and the memory cloud): check the account, pull every page and merge it, push the
+ * dirty set. Never throws for a cloud error; the result carries the state to show. iOS runs `engineSync.ts`.
  */
 export declare function runCycle(db: SQLiteDatabase, config: SyncConfig, transport: Transport, options?: CycleOptions): Promise<CycleResult>;

@@ -1,14 +1,13 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 
+import { countPending } from "./apply";
 import { runCycle } from "./cycle";
 import { beginFirstSync, deleteMeta, getMeta, setMeta } from "./install";
 import type { CloudSync, SyncConfig, SyncStatus, Transport } from "./types";
 
-/** What the sync needs from the platform; `index.ts` wires React Native's AppState, tests pass fakes. */
+/** What the sync needs from the platform; `create.ts` wires React Native's AppState, tests pass fakes. */
 export type SyncEnvironment = {
   appState?: { current: () => string; listen: (listener: (state: string) => void) => () => void };
-  /** iOS: CloudKit's silent push (ticket M4). */
-  onRemoteNotification?: (listener: () => void) => () => void;
   /** How often to look for local writes while active. */
   writePollMs?: number;
   /** A periodic cycle while active (Android has no push). */
@@ -19,9 +18,6 @@ export type SyncEnvironment = {
 const WRITE_POLL_MS = 2_000;
 const RETRY_FIRST_MS = 30_000;
 const RETRY_MAX_MS = 15 * 60_000;
-
-const countPending = async (db: SQLiteDatabase) =>
-  (await db.getFirstAsync<{ count: number }>("SELECT COUNT(*) AS count FROM _sync_changes"))?.count ?? 0;
 
 /**
  * The sync for one database. Without a transport (a platform not built yet) it only reports `unavailable`.
@@ -125,7 +121,6 @@ export function createCloudSyncWith(
           }),
         );
       }
-      if (env.onRemoteNotification) unsubscribers.push(env.onRemoteNotification(() => void syncNow()));
       if (!appState || appState.current() === "active") startTimers();
       void syncNow();
     },

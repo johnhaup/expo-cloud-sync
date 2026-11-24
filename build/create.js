@@ -1,7 +1,8 @@
 import { AppState, Platform, Settings } from "react-native";
 import { createCloudSyncWith } from "./cloudSync";
+import { createEngineSyncWith } from "./engineSync";
 import { installSyncWith } from "./install";
-import { getDeviceIdAsync } from "./native";
+import { getDeviceIdAsync, nativeSyncEngine } from "./native";
 import { createMemoryCloud, memoryTransport } from "./testing/memoryTransport";
 /** iOS launch argument (`-cloudSyncMock YES`) that swaps the cloud for an in-memory one with a signed-in account. */
 export const CLOUD_SYNC_MOCK_FLAG = "cloudSyncMock";
@@ -12,18 +13,16 @@ const isFlagOn = (value) => typeof value === "string" ? !["0", "false", "no", "o
  */
 const isMockLaunch = () => Platform.OS === "ios" && isFlagOn(Settings.get(CLOUD_SYNC_MOCK_FLAG));
 let mockCloud;
-/** The platform's transport: CloudKit (ticket M4) and Google Drive (ticket M5) are not built yet. */
-const platformTransport = () => {
-    if (isMockLaunch())
-        return memoryTransport((mockCloud ??= createMemoryCloud()));
-    return undefined;
-};
 /** Creates the _sync tables and triggers and runs restore detection. Call after migrate(), before the first read. */
 export async function installSync(db, config, options = {}) {
     await installSyncWith(db, config, options.deviceId ?? (await getDeviceIdAsync()));
 }
+/**
+ * The sync for one database: CKSyncEngine on iOS, the pull/push cycle over `transport` otherwise (the memory
+ * cloud with `-cloudSyncMock` or a passed transport; Google Drive lands with ticket M5).
+ */
 export function createCloudSync(db, config, transport) {
-    return createCloudSyncWith(db, config, transport ?? platformTransport(), {
+    const env = {
         appState: {
             current: () => String(AppState.currentState),
             listen: (listener) => {
@@ -32,5 +31,10 @@ export function createCloudSync(db, config, transport) {
             },
         },
         foregroundPollMs: Platform.OS === "android" ? 60_000 : undefined,
-    });
+    };
+    if (isMockLaunch())
+        transport ??= memoryTransport((mockCloud ??= createMemoryCloud()));
+    if (!transport && Platform.OS === "ios")
+        return createEngineSyncWith(db, config, nativeSyncEngine(), env);
+    return createCloudSyncWith(db, config, transport, env);
 }
