@@ -158,9 +158,9 @@ export function createCloudSyncWith(
       await running;
       if (deleteCloudCopy) await transport.wipe();
       await transport.signOut?.();
+      // `account_id` stays: signing in to another account later asks before merging (`accountChanged`).
       await db.withTransactionAsync(async () => {
         await deleteMeta(db, "cursor");
-        await deleteMeta(db, "account_id");
         await db.runAsync("DELETE FROM _sync_rows");
       });
       await syncNow();

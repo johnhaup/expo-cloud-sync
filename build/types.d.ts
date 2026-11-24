@@ -33,6 +33,7 @@ export type SyncState = "off" | "unavailable" | "signedOut" | "idle" | "syncing"
 export type SyncStatus = {
     state: SyncState;
     lastSyncedAt?: number;
+    /** Android: the Google account's email (with `accountChanged`, the new account's). iOS: none, iCloud gives no label. */
     accountLabel?: string;
     /** Rows changed here and not yet in the cloud. */
     pending: number;
@@ -166,9 +167,23 @@ export interface CloudSync {
     setEnabled(enabled: boolean): Promise<void>;
     /** Android: consent UI. iOS: resolves true when an iCloud account exists. */
     signIn(): Promise<boolean>;
+    /**
+     * Android: revoke Google access and stop syncing (`signedOut`). iOS: turn sync off on this device (`off`).
+     * Local data is always kept, and so is the account's id: signing in to a different account later shows
+     * `accountChanged` instead of merging.
+     *
+     * `deleteCloudCopy` deletes this app's synced copy from the account (every device's files in the Drive
+     * appDataFolder; the iCloud zone). It is not permanent while another device is still signed in to the same
+     * account with sync on: that device notices the copy is gone and uploads all of its rows again on its next
+     * sync. The app's Settings copy must say so, e.g. "Deletes the synced copy from your Google Drive. Other
+     * devices still signed in will upload their data again; sign out on them first."
+     */
     signOut(options: {
         deleteCloudCopy: boolean;
     }): Promise<void>;
-    /** After "accountChanged": merge this device's data into the new account. */
+    /**
+     * After `accountChanged`: merge this device's data into the new account (the app asks first: "Merge this
+     * phone's data into <accountLabel>?"). Until it is called nothing syncs, in either direction.
+     */
     adoptAccount(): Promise<void>;
 }

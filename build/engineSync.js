@@ -242,14 +242,19 @@ export function createEngineSyncWith(db, config, engine, env = {}) {
                 await sync.setEnabled(true);
             return signedIn;
         },
+        /**
+         * iOS has no sign-out of its own (that is iCloud's, in Settings): this turns sync off on this device and
+         * forgets the engine's state, so turning it on again is a first sync that sends every row. `account_id`
+         * stays, so another iCloud account later still asks before merging.
+         */
         async signOut({ deleteCloudCopy }) {
             await serial(async () => {
                 await stopEngine();
                 if (deleteCloudCopy)
                     await engine.wipe();
                 await db.withTransactionAsync(async () => {
+                    await setMeta(db, "enabled", "0");
                     await deleteMeta(db, "cursor");
-                    await deleteMeta(db, "account_id");
                     await db.runAsync("DELETE FROM _sync_rows");
                 });
             });

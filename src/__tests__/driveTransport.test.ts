@@ -1,7 +1,10 @@
+import { Database } from "bun:sqlite";
 import { describe, expect, test } from "bun:test";
 
 import { createCloudSyncWith } from "../cloudSync";
 import { runCycle } from "../cycle";
+import { getMeta, installSyncWith } from "../install";
+import { openTestDatabase } from "../testing/testDatabase";
 import { COMPACT_ROWS, driveTransport, fileName, type DriveFileBody } from "../drive/driveTransport";
 import type { Transport } from "../types";
 import { createFakeDrive, type FakeDrive } from "./fakeDrive";
@@ -309,5 +312,95 @@ describe("drive transport", () => {
     drive.expireToken();
     await drive.auth.clearToken(drive.current);
     expect((await sync(a)).state).toBe("accountChanged");
+  });
+
+  test("sign out, then sign in to another Google account: asks first, and merges only after adoptAccount", async () => {
+    const { drive: first, a } = await twoDevices();
+    await addNote(a.db, "n1", "mine", 10);
+    await settle(a);
+    // The second account's Drive already holds another phone's notes.
+    const second = createFakeDrive();
+    second.account = { permissionId: "perm-2", emailAddress: "two@example.com" };
+    second.current = "token-two";
+    second.valid = new Set(["token-two"]);
+    const phone = await deviceOn(second, "device-x");
+    await addFolder(phone.db, "f1", "inbox", 1);
+    await addNote(phone.db, "x1", "theirs", 20);
+    await settle(phone);
+    const beforeSecond = second.names();
+    const beforeFirst = first.names();
+
+    // One transport for device A, talking to whichever account the user picked.
+    let current = first;
+    const transport = driveTransport({
+      app: CONFIG.app,
+      deviceId: async () => "device-a",
+      auth: {
+        token: (interactive) => current.auth.token(interactive),
+        clearToken: (token) => current.auth.clearToken(token),
+        revoke: (email) => current.auth.revoke(email),
+      },
+      fetch: (input, init) => current.fetch(input, init),
+      sleep: async () => undefined,
+      now: () => 1,
+    });
+    const syncA = createCloudSyncWith(a.db, CONFIG, transport);
+    expect((await syncA.syncNow()).state).toBe("idle");
+    await syncA.signOut({ deleteCloudCopy: false });
+    expect(syncA.getStatus().state).toBe("signedOut");
+
+    current = second;
+    expect(await syncA.signIn()).toBe(true);
+    expect(syncA.getStatus()).toMatchObject({ state: "accountChanged", accountLabel: "two@example.com" });
+    // Nothing moved either way while the app asks.
+    expect(second.names()).toEqual(beforeSecond);
+    expect(await notes(a)).toEqual(["n1:mine"]);
+    expect((await syncA.syncNow()).state).toBe("accountChanged");
+
+    await syncA.adoptAccount();
+    expect(syncA.getStatus()).toMatchObject({ state: "idle", accountLabel: "two@example.com", pending: 0 });
+    expect(await getMeta(a.db, "account_id")).toBe("perm-2");
+    expect(await notes(a)).toEqual(["n1:mine", "x1:theirs"]);
+    await settle(phone);
+    expect(await notes(phone)).toEqual(["n1:mine", "x1:theirs"]);
+    // The first account's copy is untouched.
+    expect(first.names()).toEqual(beforeFirst);
+    expect(ids(fileBody(first, "device-a", "base"))).toEqual(["folders/f1", "notes/n1"]);
+  });
+
+  test("an Auto Backup restore onto a new phone gets a new device id and merges, rows written just before the backup included", async () => {
+    const { drive, a, b } = await twoDevices();
+    await addNote(a.db, "n1", "synced", 10);
+    await settle(a, b);
+    // Written seconds before the backup: never synced.
+    await addNote(a.db, "n2", "unsynced", 11);
+
+    // The backup carries A's database (device id, cursor, account) to a phone whose no-backup id is new.
+    const restored = openTestDatabase(Database.deserialize(a.file.serialize()));
+    await installSyncWith(restored, CONFIG, "device-c");
+    expect(await getMeta(restored, "device_id")).toBe("device-c");
+    expect(await getMeta(restored, "cursor")).toBeNull();
+    expect(await dirty(restored)).toEqual(["folders/f1", "notes/n1", "notes/n2"]);
+
+    const c: DriveDevice = { db: restored, file: a.file, deviceId: "device-c", transport: transportFor(drive, "device-c") };
+    // Same Google account as the backup's: no question, it merges.
+    await settle(c, b);
+    expect(await notes(c)).toEqual(["n1:synced", "n2:unsynced"]);
+    expect(await notes(b)).toEqual(["n1:synced", "n2:unsynced"]);
+    // C read A's files on its first pull, so only what was new to the cloud goes up under its own id.
+    expect(ids(fileBody(drive, "device-c", "base"))).toEqual(["notes/n2"]);
+    // A's files stay as they were; the restore never writes under the old id.
+    expect(ids(fileBody(drive, "device-a", "base"))).toEqual(["folders/f1", "notes/n1"]);
+  });
+
+  test("a restore onto a phone signed in to another Google account asks before merging", async () => {
+    const { a } = await twoDevices();
+    const other = createFakeDrive();
+    other.account = { permissionId: "perm-2", emailAddress: "two@example.com" };
+    const restored = openTestDatabase(Database.deserialize(a.file.serialize()));
+    await installSyncWith(restored, CONFIG, "device-c");
+    const c: DriveDevice = { db: restored, file: a.file, deviceId: "device-c", transport: transportFor(other, "device-c") };
+    expect((await sync(c)).state).toBe("accountChanged");
+    expect(other.names()).toEqual([]);
   });
 });

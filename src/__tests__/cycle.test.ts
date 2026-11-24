@@ -1,12 +1,17 @@
+import { Database } from "bun:sqlite";
 import { describe, expect, test } from "bun:test";
+import { mkdtempSync, rmSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { createCloudSyncWith } from "../cloudSync";
 import { runCycle } from "../cycle";
-import { getMeta, setMeta } from "../install";
+import { getMeta, installSyncWith, setMeta } from "../install";
 import { payloadOf } from "../merge";
 import { createMemoryCloud, memoryTransport, type MemoryCloud } from "../testing/memoryTransport";
+import { openTestDatabase } from "../testing/testDatabase";
 import type { Transport } from "../types";
-import { addFolder, addNote, CONFIG, dirty, editNote, note, openDevice, sync, type Device } from "./fixtures";
+import { addFolder, addNote, CONFIG, dirty, editNote, note, openDevice, SCHEMA, sync, type Device } from "./fixtures";
 
 const notes = async (device: Device) =>
   (await device.db.getAllAsync<{ id: string; body: string; deleted_at: number | null }>("SELECT id, body, deleted_at FROM notes ORDER BY id")).map(
@@ -349,6 +354,37 @@ describe("CloudSync", () => {
     expect(await syncA.signIn()).toBe(true);
     expect(syncA.getStatus().state).toBe("idle");
     expect(cloud.records().map((r) => r.id).sort()).toEqual(["a1", "f1"]);
+  });
+
+  test("going to the background folds the WAL into the database file, signed in or not", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "cloud-sync-wal-"));
+    try {
+      const path = join(dir, "app.db");
+      const file = new Database(path);
+      file.exec("PRAGMA journal_mode = WAL");
+      const db = openTestDatabase(file);
+      await db.execAsync(SCHEMA);
+      await installSyncWith(db, CONFIG, "device-a");
+      await addFolder(db, "f1", "inbox", 1);
+      await addNote(db, "n1", "written just now", 10);
+      expect(statSync(`${path}-wal`).size).toBeGreaterThan(0);
+
+      // Never signed in: Auto Backup is all this user has.
+      const cloud = createMemoryCloud({ state: "none" });
+      let toState: (state: string) => void = () => undefined;
+      const syncA = createCloudSyncWith(db, CONFIG, memoryTransport(cloud), {
+        appState: { current: () => "active", listen: (listener) => ((toState = listener), () => undefined) },
+      });
+      syncA.start();
+      toState("background");
+      for (let i = 0; i < 50 && statSync(`${path}-wal`).size > 0; i++) await Bun.sleep(5);
+      syncA.stop();
+      expect(syncA.getStatus().state).toBe("signedOut");
+      expect(statSync(`${path}-wal`).size).toBe(0);
+      file.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   test("without a transport it only reports unavailable", async () => {

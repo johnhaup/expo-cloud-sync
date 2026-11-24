@@ -301,4 +301,32 @@ describe("CKSyncEngine driver", () => {
     await sync.setEnabled(true);
     expect(fake.running).toBe(true);
   });
+
+  test("delete iCloud copy: wipes the zone, turns sync off here, and turning it on sends every row again", async () => {
+    const { device, fake, sync } = await setup();
+    await play(sync, { type: "stateUpdate", state: "engine-state" });
+    await sync.signOut({ deleteCloudCopy: true });
+    expect(fake.wipes).toBe(1);
+    expect(fake.running).toBe(false);
+    expect(sync.getStatus().state).toBe("off");
+    expect(await getMeta(device.db, "cursor")).toBeNull();
+    expect(await getMeta(device.db, "account_id")).toBe("icloud-1");
+
+    await sync.setEnabled(true);
+    expect(fake.starts.at(-1)).toEqual({ state: null, pending: [expect.objectContaining({ id: "f1" })] });
+    expect(sync.getStatus().state).toBe("idle");
+  });
+
+  test("after turning sync off, another iCloud account still asks before merging", async () => {
+    const { device, fake, sync } = await setup();
+    await addNote(device.db, "n1", "mine", 10);
+    await sync.signOut({ deleteCloudCopy: false });
+    fake.account = { state: "available", id: "icloud-2" };
+    await sync.setEnabled(true);
+    expect(sync.getStatus().state).toBe("accountChanged");
+    expect(fake.running).toBe(false);
+    await sync.adoptAccount();
+    expect(await getMeta(device.db, "account_id")).toBe("icloud-2");
+    expect(fake.starts.at(-1)?.pending.map((record) => record.id)).toEqual(["f1", "n1"]);
+  });
 });
