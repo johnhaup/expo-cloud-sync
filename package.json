@@ -1,6 +1,6 @@
 {
   "name": "@johnhaup/expo-cloud-sync",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Record sync for expo-sqlite apps: CloudKit private database on iOS, Google Drive appDataFolder on Android",
   "main": "build/index.js",
   "types": "build/index.d.ts",

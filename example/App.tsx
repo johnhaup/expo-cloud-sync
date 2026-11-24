@@ -66,8 +66,9 @@ const knobs = {
 };
 
 /**
- * Two "devices" (two databases in this process) syncing through one in-memory cloud, with switches that
- * put the cloud into every state the sync handles. The native device id shows the module is linked.
+ * One database on the platform's real sync (iCloud through CKSyncEngine on iOS), then two "devices" (two
+ * databases in this process) syncing through one in-memory cloud, with switches that put the cloud into every
+ * state the sync handles. The native device id shows the module is linked.
  */
 export default function App() {
   const dark = useColorScheme() === "dark";
@@ -86,6 +87,18 @@ export default function App() {
       <Text testID="device-id" style={{ color: colors.muted }} selectable>
         Device id: {deviceId}
       </Text>
+      <SQLiteProvider
+        databaseName="icloud.db"
+        onInit={async (db) => {
+          await migrate(db);
+          await installSync(db, CONFIG);
+        }}
+      >
+        {/* The platform's own sync: CKSyncEngine on iOS (needs the iCloud container and a signed-in account). */}
+        <CloudSyncProvider config={CONFIG}>
+          <Notes name="iCloud" colors={colors} />
+        </CloudSyncProvider>
+      </SQLiteProvider>
       <CloudControls cloud={cloud} colors={colors} />
       {(["a", "b"] as const).map((name) => (
         <SQLiteProvider
@@ -117,7 +130,7 @@ function CloudControls({ cloud, colors }: { cloud: MemoryCloud; colors: Colors }
   ] as const;
   return (
     <View style={[styles.card, { backgroundColor: colors.card }]}>
-      <Text style={[styles.heading, { color: colors.text }]}>Cloud ({cloud.records().length} records)</Text>
+      <Text style={[styles.heading, { color: colors.text }]}>Memory cloud ({cloud.records().length} records)</Text>
       <View style={styles.row}>
         {accounts.map(({ label, account }) => (
           <Button
@@ -181,7 +194,7 @@ function Notes({ name, colors }: { name: string; colors: Colors }) {
 
   return (
     <View style={[styles.card, { backgroundColor: colors.card }]}>
-      <Text style={[styles.heading, { color: colors.text }]}>Device {name}</Text>
+      <Text style={[styles.heading, { color: colors.text }]}>{name.length > 1 ? name : `Device ${name}`}</Text>
 
       <View testID={`sync-${name}`} style={styles.sync}>
         <Text style={{ color: colors.text }}>

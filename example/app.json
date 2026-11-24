@@ -5,8 +5,17 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
-    "ios": { "bundleIdentifier": "com.johnhaup.cloudsync.example", "supportsTablet": true },
-    "android": { "package": "com.johnhaup.cloudsync.example" },
-    "plugins": ["expo-sqlite", "../app.plugin.js"]
+    "ios": {
+      "bundleIdentifier": "com.johnhaup.cloudsync.example",
+      "supportsTablet": true,
+      "deploymentTarget": "17.0"
+    },
+    "android": {
+      "package": "com.johnhaup.cloudsync.example"
+    },
+    "plugins": [
+      "expo-sqlite",
+      "../app.plugin.js"
+    ]
   }
 }
