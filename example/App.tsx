@@ -11,7 +11,7 @@ import {
 import { SQLiteProvider, type SQLiteDatabase, useSQLiteContext } from "expo-sqlite";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, useColorScheme, View } from "react-native";
+import { Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, useColorScheme, View } from "react-native";
 
 const SCHEMA_VERSION = 1;
 
@@ -65,8 +65,11 @@ const knobs = {
   },
 };
 
+/** The platform's own sync: CKSyncEngine on iOS, the Drive appDataFolder on Android. */
+const PLATFORM_CLOUD = Platform.OS === "android" ? "Google Drive" : "iCloud";
+
 /**
- * One database on the platform's real sync (iCloud through CKSyncEngine on iOS), then two "devices" (two
+ * One database on the platform's real sync (iCloud through CKSyncEngine on iOS, Google Drive on Android), then two "devices" (two
  * databases in this process) syncing through one in-memory cloud, with switches that put the cloud into every
  * state the sync handles. The native device id shows the module is linked.
  */
@@ -94,9 +97,9 @@ export default function App() {
           await installSync(db, CONFIG);
         }}
       >
-        {/* The platform's own sync: CKSyncEngine on iOS (needs the iCloud container and a signed-in account). */}
+        {/* iOS needs the iCloud container and a signed-in account; Android a Google Cloud OAuth client and a sign-in. */}
         <CloudSyncProvider config={CONFIG}>
-          <Notes name="iCloud" colors={colors} />
+          <Notes name={PLATFORM_CLOUD} colors={colors} />
         </CloudSyncProvider>
       </SQLiteProvider>
       <CloudControls cloud={cloud} colors={colors} />
@@ -208,6 +211,18 @@ function Notes({ name, colors }: { name: string; colors: Colors }) {
           <Button label="Sync now" colors={colors} onPress={() => void sync.syncNow()} />
           {sync.state === "accountChanged" ? <Button label="Merge into this account" colors={colors} onPress={() => void sync.adoptAccount()} /> : null}
         </View>
+        {name === "Google Drive" ? (
+          <View style={styles.row}>
+            {sync.state === "signedOut" ? (
+              <Button label="Sign in with Google" colors={colors} onPress={() => void sync.signIn()} />
+            ) : (
+              <>
+                <Button label="Sign out" colors={colors} onPress={() => void sync.signOut({ deleteCloudCopy: false })} />
+                <Button label="Sign out and delete synced copy" colors={colors} onPress={() => void sync.signOut({ deleteCloudCopy: true })} />
+              </>
+            )}
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.row}>
