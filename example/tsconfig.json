@@ -1,0 +1,8 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "paths": { "@johnhaup/expo-cloud-sync": ["../src"] }
+  },
+  "include": ["**/*.ts", "**/*.tsx"]
+}
