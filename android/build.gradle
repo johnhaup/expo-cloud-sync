@@ -2,7 +2,7 @@ apply plugin: 'com.android.library'
 apply plugin: 'org.jetbrains.kotlin.android'
 
 group = 'com.johnhaup.cloudsync'
-version = '0.1.0'
+version = '0.3.0'
 
 android {
   namespace 'com.johnhaup.cloudsync'
@@ -25,6 +25,8 @@ android {
 
 dependencies {
   implementation project(':expo-modules-core')
+  // AuthorizationClient with clearToken and revokeAccess (21.4.0+).
+  implementation 'com.google.android.gms:play-services-auth:22.0.0'
 }
 
 def safeExtGet(prop, fallback) {

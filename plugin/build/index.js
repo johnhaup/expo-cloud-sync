@@ -29,4 +29,4 @@ const withCloudSync = (config, props) => {
         return config;
     });
 };
-exports.default = (0, config_plugins_1.createRunOncePlugin)(withCloudSync, "@johnhaup/expo-cloud-sync", "0.2.0");
+exports.default = (0, config_plugins_1.createRunOncePlugin)(withCloudSync, "@johnhaup/expo-cloud-sync", "0.3.0");

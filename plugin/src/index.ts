@@ -38,4 +38,4 @@ const withCloudSync: ConfigPlugin<CloudSyncPluginProps | void> = (config, props)
   });
 };
 
-export default createRunOncePlugin(withCloudSync, "@johnhaup/expo-cloud-sync", "0.2.0");
+export default createRunOncePlugin(withCloudSync, "@johnhaup/expo-cloud-sync", "0.3.0");
