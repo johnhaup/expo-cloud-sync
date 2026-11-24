@@ -1,0 +1,44 @@
+{
+  "name": "@johnhaup/expo-cloud-sync",
+  "version": "0.1.0",
+  "description": "Record sync for expo-sqlite apps: CloudKit private database on iOS, Google Drive appDataFolder on Android",
+  "main": "build/index.js",
+  "types": "build/index.d.ts",
+  "files": [
+    "build",
+    "plugin/build",
+    "app.plugin.js",
+    "expo-module.config.json",
+    "ios",
+    "android/build.gradle",
+    "android/src/main"
+  ],
+  "scripts": {
+    "build": "rm -rf build plugin/build && tsc -p tsconfig.build.json && tsc -p plugin",
+    "check:build": "bash scripts/check-build.sh",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p plugin && tsc --noEmit -p example",
+    "lint": "eslint .",
+    "test": "bun test",
+    "check": "bun run typecheck && bun run lint && bun test && bun run check:build"
+  },
+  "peerDependencies": {
+    "expo": "*",
+    "expo-sqlite": "*",
+    "react": "*",
+    "react-native": "*"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.5",
+    "@types/react": "~19.3.0",
+    "eslint": "^9",
+    "eslint-config-expo": "^58.0.4",
+    "expo": "~58.0.26",
+    "expo-sqlite": "~58.0.18",
+    "react": "19.3.0",
+    "react-native": "0.88.1",
+    "typescript": "~6.0.3"
+  },
+  "repository": "github:johnhaup/expo-cloud-sync",
+  "license": "UNLICENSED",
+  "private": true
+}

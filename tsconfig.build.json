@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "module": "esnext",
+    "declaration": true,
+    "outDir": "build",
+    "rootDir": "src",
+    "types": []
+  },
+  "exclude": ["src/__tests__", "src/testing/testDatabase.ts"]
+}
