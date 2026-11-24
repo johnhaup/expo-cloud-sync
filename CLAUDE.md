@@ -25,7 +25,9 @@ bun run check        # all of the above
 - **`build/` is committed**: apps install this repo as a git dependency pinned to a tag, and bun runs no build
   step for it. Run `bun run build` and commit the result with every `src/` or `plugin/src/` change;
   `bun run check:build` must pass before a tag.
-- Releases are tags (`v0.1.0`); apps move by changing the tag in their `package.json`.
+- Releases are tags (`v0.1.0`); apps move by changing the tag in their `package.json`. The repo is private,
+  so apps depend on `git+ssh://git@github.com/johnhaup/expo-cloud-sync.git#<tag>`: bun fetches `github:` and
+  `git+https:` specs through GitHub's unauthenticated tarball API, which answers 404 (checked 2026-11-23).
 - `src/cycle.ts`, `src/install.ts`, `src/merge.ts` and `src/cloudSync.ts` never import `react-native` or the
   native module, so they run under `bun test`. Platform wiring lives in `src/create.ts`.
 - Every change to the merge rules, triggers or cycle gets a test in `src/__tests__/`.
