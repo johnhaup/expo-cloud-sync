@@ -29,6 +29,26 @@ async function migrate(db: SQLiteDatabase) {
   `);
 }
 
+/**
+ * `SQLiteProvider` reruns `onInit` whenever its identity changes, on the same shared connection: an inline
+ * function would run `installSync` twice at once on every re-render ("cannot start a transaction within a
+ * transaction"). Keep them stable.
+ */
+const initPlatform = async (db: SQLiteDatabase) => {
+  await migrate(db);
+  await installSync(db, CONFIG);
+};
+const initDevice = {
+  a: async (db: SQLiteDatabase) => {
+    await migrate(db);
+    await installSync(db, CONFIG, { deviceId: "example-a" });
+  },
+  b: async (db: SQLiteDatabase) => {
+    await migrate(db);
+    await installSync(db, CONFIG, { deviceId: "example-b" });
+  },
+};
+
 const newId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
 type Note = { id: string; body: string; updated_at: number };
@@ -90,13 +110,7 @@ export default function App() {
       <Text testID="device-id" style={{ color: colors.muted }} selectable>
         Device id: {deviceId}
       </Text>
-      <SQLiteProvider
-        databaseName="icloud.db"
-        onInit={async (db) => {
-          await migrate(db);
-          await installSync(db, CONFIG);
-        }}
-      >
+      <SQLiteProvider databaseName="icloud.db" onInit={initPlatform}>
         {/* iOS needs the iCloud container and a signed-in account; Android a Google Cloud OAuth client and a sign-in. */}
         <CloudSyncProvider config={CONFIG}>
           <Notes name={PLATFORM_CLOUD} colors={colors} />
@@ -104,14 +118,7 @@ export default function App() {
       </SQLiteProvider>
       <CloudControls cloud={cloud} colors={colors} />
       {(["a", "b"] as const).map((name) => (
-        <SQLiteProvider
-          key={name}
-          databaseName={`device-${name}.db`}
-          onInit={async (db) => {
-            await migrate(db);
-            await installSync(db, CONFIG, { deviceId: `example-${name}` });
-          }}
-        >
+        <SQLiteProvider key={name} databaseName={`device-${name}.db`} onInit={initDevice[name]}>
           <Device name={name.toUpperCase()} cloud={cloud} colors={colors} />
         </SQLiteProvider>
       ))}
@@ -207,10 +214,16 @@ function Notes({ name, colors }: { name: string; colors: Colors }) {
         {sync.lastSyncedAt ? <Text style={{ color: colors.muted }}>Last synced {new Date(sync.lastSyncedAt).toLocaleTimeString()}</Text> : null}
         {sync.error ? <Text style={{ color: colors.danger }}>{sync.error}</Text> : null}
         <Toggle label="Sync on" value={sync.state !== "off"} colors={colors} onChange={(on) => void sync.setEnabled(on)} />
-        <View style={styles.row}>
-          <Button label="Sync now" colors={colors} onPress={() => void sync.syncNow()} />
-          {sync.state === "accountChanged" ? <Button label="Merge into this account" colors={colors} onPress={() => void sync.adoptAccount()} /> : null}
-        </View>
+        <Button label="Sync now" colors={colors} onPress={() => void sync.syncNow()} />
+        {sync.state === "accountChanged" ? (
+          // Nothing syncs until the user answers; "Not now" just leaves it waiting.
+          <View testID={`account-changed-${name}`} style={styles.sync}>
+            <Text style={{ color: colors.text }}>
+              {sync.accountLabel ? `Merge this phone's data into ${sync.accountLabel}?` : "Merge this phone's data into this iCloud account?"}
+            </Text>
+            <Button label="Merge" colors={colors} onPress={() => void sync.adoptAccount()} />
+          </View>
+        ) : null}
         {name === "Google Drive" ? (
           <View style={styles.row}>
             {sync.state === "signedOut" ? (
@@ -222,6 +235,15 @@ function Notes({ name, colors }: { name: string; colors: Colors }) {
               </>
             )}
           </View>
+        ) : null}
+        {name === "iCloud" && sync.state !== "off" ? (
+          <Button label="Turn off and delete iCloud copy" colors={colors} onPress={() => void sync.signOut({ deleteCloudCopy: true })} />
+        ) : null}
+        {name === PLATFORM_CLOUD ? (
+          <Text style={{ color: colors.muted }}>
+            Deleting the synced copy removes it from your {name}. Other devices still signed in will upload their data again; sign out or turn sync
+            off on them first.
+          </Text>
         ) : null}
       </View>
 
