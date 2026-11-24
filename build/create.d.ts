@@ -7,7 +7,7 @@ export declare function installSync(db: SQLiteDatabase, config: SyncConfig, opti
     deviceId?: string;
 }): Promise<void>;
 /**
- * The sync for one database: CKSyncEngine on iOS, the pull/push cycle over `transport` otherwise (the memory
- * cloud with `-cloudSyncMock` or a passed transport; Google Drive lands with ticket M5).
+ * The sync for one database: CKSyncEngine on iOS, the pull/push cycle over Google Drive's appDataFolder on
+ * Android. A passed transport (or the memory cloud with `-cloudSyncMock`) replaces the platform's.
  */
 export declare function createCloudSync(db: SQLiteDatabase, config: SyncConfig, transport?: Transport): CloudSync;

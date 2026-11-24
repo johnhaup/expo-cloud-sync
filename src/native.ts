@@ -1,5 +1,6 @@
 import { NativeModule, requireNativeModule } from "expo";
 
+import type { DriveAuth } from "./drive/driveApi";
 import type { Account, EngineEvent, SyncEngine, SyncRecord } from "./types";
 
 declare class CloudSyncNative extends NativeModule<{ onEngineEvent: (event: EngineEvent) => void }> {
@@ -12,6 +13,10 @@ declare class CloudSyncNative extends NativeModule<{ onEngineEvent: (event: Engi
   syncAsync(): Promise<void>;
   stopAsync(): Promise<void>;
   wipeAsync(): Promise<void>;
+  // Android only: Google authorization for drive.appdata.
+  authorizeAsync(interactive: boolean): Promise<string | null>;
+  clearTokenAsync(token: string): Promise<void>;
+  revokeAccessAsync(email: string): Promise<void>;
 }
 
 let native: CloudSyncNative | undefined;
@@ -35,5 +40,15 @@ export function nativeSyncEngine(): SyncEngine {
       const subscription = module.addListener("onEngineEvent", listener);
       return () => subscription.remove();
     },
+  };
+}
+
+/** Android: AuthorizationClient (drive.appdata) in the module's native code. */
+export function nativeGoogleAuth(): DriveAuth {
+  const module = cloudSyncNative();
+  return {
+    token: (interactive) => module.authorizeAsync(interactive),
+    clearToken: (token) => module.clearTokenAsync(token),
+    revoke: (email) => module.revokeAccessAsync(email),
   };
 }

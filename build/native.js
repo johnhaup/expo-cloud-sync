@@ -19,3 +19,12 @@ export function nativeSyncEngine() {
         },
     };
 }
+/** Android: AuthorizationClient (drive.appdata) in the module's native code. */
+export function nativeGoogleAuth() {
+    const module = cloudSyncNative();
+    return {
+        token: (interactive) => module.authorizeAsync(interactive),
+        clearToken: (token) => module.clearTokenAsync(token),
+        revoke: (email) => module.revokeAccessAsync(email),
+    };
+}

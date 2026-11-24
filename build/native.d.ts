@@ -1,4 +1,5 @@
 import { NativeModule } from "expo";
+import type { DriveAuth } from "./drive/driveApi";
 import type { Account, EngineEvent, SyncEngine, SyncRecord } from "./types";
 declare class CloudSyncNative extends NativeModule<{
     onEngineEvent: (event: EngineEvent) => void;
@@ -11,10 +12,15 @@ declare class CloudSyncNative extends NativeModule<{
     syncAsync(): Promise<void>;
     stopAsync(): Promise<void>;
     wipeAsync(): Promise<void>;
+    authorizeAsync(interactive: boolean): Promise<string | null>;
+    clearTokenAsync(token: string): Promise<void>;
+    revokeAccessAsync(email: string): Promise<void>;
 }
 /** Loaded on first use, so importing the package does not need the native module (tests, web). */
 export declare const cloudSyncNative: () => CloudSyncNative;
 export declare const getDeviceIdAsync: () => Promise<string>;
 /** iOS: CKSyncEngine in the module's native code. */
 export declare function nativeSyncEngine(): SyncEngine;
+/** Android: AuthorizationClient (drive.appdata) in the module's native code. */
+export declare function nativeGoogleAuth(): DriveAuth;
 export {};

@@ -2,9 +2,10 @@ import type { SQLiteDatabase } from "expo-sqlite";
 import { AppState, Platform, Settings } from "react-native";
 
 import { createCloudSyncWith, type SyncEnvironment } from "./cloudSync";
+import { driveTransport } from "./drive/driveTransport";
 import { createEngineSyncWith } from "./engineSync";
-import { installSyncWith } from "./install";
-import { getDeviceIdAsync, nativeSyncEngine } from "./native";
+import { getMeta, installSyncWith } from "./install";
+import { getDeviceIdAsync, nativeGoogleAuth, nativeSyncEngine } from "./native";
 import { createMemoryCloud, memoryTransport } from "./testing/memoryTransport";
 import type { CloudSync, SyncConfig, Transport } from "./types";
 
@@ -28,8 +29,8 @@ export async function installSync(db: SQLiteDatabase, config: SyncConfig, option
 }
 
 /**
- * The sync for one database: CKSyncEngine on iOS, the pull/push cycle over `transport` otherwise (the memory
- * cloud with `-cloudSyncMock` or a passed transport; Google Drive lands with ticket M5).
+ * The sync for one database: CKSyncEngine on iOS, the pull/push cycle over Google Drive's appDataFolder on
+ * Android. A passed transport (or the memory cloud with `-cloudSyncMock`) replaces the platform's.
  */
 export function createCloudSync(db: SQLiteDatabase, config: SyncConfig, transport?: Transport): CloudSync {
   const env: SyncEnvironment = {
@@ -44,5 +45,12 @@ export function createCloudSync(db: SQLiteDatabase, config: SyncConfig, transpor
   };
   if (isMockLaunch()) transport ??= memoryTransport((mockCloud ??= createMemoryCloud()));
   if (!transport && Platform.OS === "ios") return createEngineSyncWith(db, config, nativeSyncEngine(), env);
+  if (!transport && Platform.OS === "android") {
+    transport = driveTransport({
+      app: config.app,
+      auth: nativeGoogleAuth(),
+      deviceId: async () => (await getMeta(db, "device_id")) ?? (await getDeviceIdAsync()),
+    });
+  }
   return createCloudSyncWith(db, config, transport, env);
 }

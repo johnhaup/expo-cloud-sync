@@ -57,7 +57,7 @@ export async function beginFirstSync(db: SQLiteDatabase, config: SyncConfig) {
 const SCHEMA = `
   CREATE TABLE IF NOT EXISTS _sync_meta (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS _sync_changes (table_name TEXT NOT NULL, row_id TEXT NOT NULL, PRIMARY KEY (table_name, row_id)) WITHOUT ROWID;
-  CREATE TABLE IF NOT EXISTS _sync_rows (table_name TEXT NOT NULL, row_id TEXT NOT NULL, sys TEXT, in_delta INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (table_name, row_id)) WITHOUT ROWID;
+  CREATE TABLE IF NOT EXISTS _sync_rows (table_name TEXT NOT NULL, row_id TEXT NOT NULL, sys TEXT, PRIMARY KEY (table_name, row_id)) WITHOUT ROWID;
 `;
 
 const NOT_APPLYING = "(SELECT value FROM _sync_meta WHERE key = 'applying') IS NOT '1'";
