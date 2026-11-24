@@ -28,7 +28,9 @@ bun run check        # all of the above
 - Releases are tags (`v0.1.0`); apps move by changing the tag in their `package.json`. The repo is public
   (John, 2026-11-23), so apps depend on `github:johnhaup/expo-cloud-sync#<tag>`; it installs on the Air, mbp-1tb
   and the Linux worker. If it goes private again, bun can only fetch it over `git+ssh://`.
-- `src/cycle.ts`, `src/install.ts`, `src/merge.ts` and `src/cloudSync.ts` never import `react-native` or the
-  native module, so they run under `bun test`. Platform wiring lives in `src/create.ts`.
+- `src/apply.ts`, `src/cycle.ts`, `src/engineSync.ts`, `src/install.ts`, `src/merge.ts` and `src/cloudSync.ts` never
+  import `react-native` or the native module, so they run under `bun test`. Platform wiring lives in `src/create.ts`.
+- iOS runs CKSyncEngine (`src/engineSync.ts` + `ios/CloudSyncEngine.swift`), Android the pull/push cycle
+  (`src/cycle.ts`); both merge through `src/apply.ts`. Apps target iOS 17.0 (`ios.deploymentTarget`).
 - Every change to the merge rules, triggers or cycle gets a test in `src/__tests__/`.
 - Synced tables: `id`, `updated_at` (ms), `deleted_at` tombstone; app migrations on them are additive only.
