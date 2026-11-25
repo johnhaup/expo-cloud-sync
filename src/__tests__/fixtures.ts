@@ -2,7 +2,7 @@ import { Database } from "bun:sqlite";
 import type { SQLiteDatabase } from "expo-sqlite";
 
 import { runCycle } from "../cycle";
-import { installSyncWith } from "../install";
+import { deleteMeta, installSyncWith } from "../install";
 import { memoryTransport, type MemoryCloud } from "../testing/memoryTransport";
 import { openTestDatabase } from "../testing/testDatabase";
 import type { SyncConfig } from "../types";
@@ -26,11 +26,16 @@ export const CONFIG: SyncConfig = {
   tables: [{ name: "settings", key: "key", tombstone: null, excludeKeys: ["pro"] }, { name: "folders" }, { name: "notes" }],
 };
 
-export async function openDevice(deviceId = "device-a", config = CONFIG) {
+/**
+ * A device on a new database. Unless `fresh`, it is treated as one whose first download already finished
+ * (most tests are about devices that have synced before); `fresh` keeps the new-install state (`decide`).
+ */
+export async function openDevice(deviceId = "device-a", config = CONFIG, { fresh = false } = {}) {
   const file = new Database(":memory:");
   const db = openTestDatabase(file);
   await db.execAsync(SCHEMA);
   await installSyncWith(db, config, deviceId);
+  if (!fresh) await deleteMeta(db, "fresh");
   return { db, file, deviceId };
 }
 

@@ -112,12 +112,19 @@ const byTableOrder = (config: SyncConfig) => {
   return (a: SyncRecord, b: SyncRecord) => (order.get(a.table) ?? 0) - (order.get(b.table) ?? 0);
 };
 
+/** A new install whose first download has not finished: the cloud's rows win (`decide`). */
+const isFresh = async (db: SQLiteDatabase) => (await getMeta(db, "fresh")) === "1";
+
+/** The first download finished: from now on the newer row wins, as everywhere else. */
+export const endFresh = (db: SQLiteDatabase) => deleteMeta(db, "fresh");
+
 /** Merges fetched records (parents first) inside an `applying` transaction. */
 export async function mergeRecords(ctx: Context, txn: SQLiteDatabase, records: SyncRecord[]) {
+  const fresh = await isFresh(txn);
   for (const record of [...records].sort(byTableOrder(ctx.config))) {
     const table = ctx.tables.get(record.table);
     if (!table || table.excludeKeys.includes(record.id)) continue;
-    const verdict = decide(await localRow(txn, table, record.id), record);
+    const verdict = decide(await localRow(txn, table, record.id), record, fresh);
     if (verdict === "apply") await applyRecord(ctx, txn, table, record);
     // The local row won: it must reach the cloud even if it was not dirty. Otherwise it equals the cloud's.
     if (verdict === "keep") await markDirty(txn, table.name, record.id);
@@ -148,7 +155,7 @@ export async function settleSaved(ctx: Context, txn: SQLiteDatabase, saved: { ta
 export async function settleConflict(ctx: Context, txn: SQLiteDatabase, server: SyncRecord) {
   const table = ctx.tables.get(server.table);
   if (!table) return false;
-  const verdict = decide(await localRow(txn, table, server.id), server);
+  const verdict = decide(await localRow(txn, table, server.id), server, await isFresh(txn));
   if (verdict === "apply") await applyRecord(ctx, txn, table, server);
   if (verdict !== "keep") await clean(txn, server.table, server.id);
   await storeSys(txn, server, server.sys);

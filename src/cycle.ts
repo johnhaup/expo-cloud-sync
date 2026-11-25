@@ -3,6 +3,7 @@ import {
   applying,
   createContext,
   dirtyRecords,
+  endFresh,
   gate,
   holdForNewerSchema,
   mergeRecords,
@@ -122,6 +123,7 @@ export async function runCycle(
     ctx = await createContext(db, config);
     const pulled = await pull(ctx, transport);
     if (pulled) return result(pulled, account);
+    await endFresh(db);
     const pushed = options.pushPaused ? { state: "quotaExceeded" as const } : await push(ctx, transport, (await getMeta(db, "device_id")) ?? "");
     if (pushed) return result(pushed, account);
     await setMeta(db, "last_synced_at", String((options.now ?? Date.now)()));

@@ -97,8 +97,8 @@ export type EngineEvent =
   | { type: "error"; reason: "quota" | "other"; message?: string }
   /** `willFetchChanges` / `willSendChanges`. */
   | { type: "willSync" }
-  /** `didFetchChanges` / `didSendChanges`. */
-  | { type: "didSync" };
+  /** `didFetchChanges` (`fetched: true`) / `didSendChanges`. */
+  | { type: "didSync"; fetched?: boolean };
 
 /**
  * iOS: the native CKSyncEngine host. It owns scheduling, change tokens, retries and push; JS owns the database,

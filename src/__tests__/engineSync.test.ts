@@ -329,4 +329,31 @@ describe("CKSyncEngine driver", () => {
     expect(await getMeta(device.db, "account_id")).toBe("icloud-2");
     expect(fake.starts.at(-1)?.pending.map((record) => record.id)).toEqual(["f1", "n1"]);
   });
+
+  test("a new install: the cloud wins until the engine's first fetch finishes (HAU-792)", async () => {
+    const device = await openDevice("device-a", CONFIG, { fresh: true });
+    await addFolder(device.db, "f1", "inbox", 1);
+    await addNote(device.db, "n1", "default at 50", 50);
+    await addNote(device.db, "n2", "default at 50", 50);
+    const fake = fakeEngine();
+    const { sync } = await startSync(device, fake);
+    fakes.set(sync, fake);
+
+    await play(sync, { type: "fetched", records: [remoteNote("n1", "cloud at 40", 40)] });
+    expect((await note(device.db, "n1"))?.body).toBe("cloud at 40");
+    // A save that reached a newer server copy settles to the server's, too.
+    await play(sync, { type: "sent", results: [{ table: "notes", id: "n2", result: "conflict", server: remoteNote("n2", "cloud at 30", 30) }] });
+    expect((await note(device.db, "n2"))?.body).toBe("cloud at 30");
+
+    // A send finishing is not the end of the first fetch.
+    await play(sync, { type: "didSync" });
+    expect(await getMeta(device.db, "fresh")).toBe("1");
+    await play(sync, { type: "didSync", fetched: true });
+    expect(await getMeta(device.db, "fresh")).toBeNull();
+
+    // From now on the newer row wins.
+    await editNote(device.db, "n1", "mine at 60", 60);
+    await play(sync, { type: "fetched", records: [remoteNote("n1", "cloud at 55", 55)] });
+    expect((await note(device.db, "n1"))?.body).toBe("mine at 60");
+  });
 });

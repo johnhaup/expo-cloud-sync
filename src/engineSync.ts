@@ -6,6 +6,7 @@ import {
   countPending,
   createContext,
   dirtyRecords,
+  endFresh,
   gate,
   holdForNewerSchema,
   mergeRecords,
@@ -166,6 +167,7 @@ export function createEngineSyncWith(db: SQLiteDatabase, config: SyncConfig, eng
         if (status.state === "idle") await emit("syncing");
         return;
       case "didSync":
+        if (event.fetched) await endFresh(db);
         if (status.state === "idle" || status.state === "syncing" || status.state === "error") {
           await setMeta(db, "last_synced_at", String((env.now ?? Date.now)()));
           await emit("idle");

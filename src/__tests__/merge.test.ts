@@ -30,6 +30,12 @@ describe("decide", () => {
     expect(decide(record(1, '{"a":1,"b":1}'), record(2, '{"a":2}'))).toBe("apply");
   });
 
+  test("a new install before its first download: the remote record wins even when older", () => {
+    expect(decide(record(50, '{"a":1}'), record(10, '{"a":2}'), true)).toBe("apply");
+    expect(decide(record(10, '{"a":1}'), record(10, '{"a":1}'), true)).toBe("same");
+    expect(decide(undefined, record(1, "{}"), true)).toBe("apply");
+  });
+
   test("payloads are independent of column order", () => {
     expect(payloadOf({ b: 1, a: "x", c: null })).toBe(payloadOf({ c: null, a: "x", b: 1 }));
     expect(payloadOf({ b: 1, a: "x" })).toBe('{"a":"x","b":1}');

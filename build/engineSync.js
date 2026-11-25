@@ -1,4 +1,4 @@
-import { accountGate, applying, countPending, createContext, dirtyRecords, gate, holdForNewerSchema, mergeRecords, settleConflict, settleSaved, } from "./apply";
+import { accountGate, applying, countPending, createContext, dirtyRecords, endFresh, gate, holdForNewerSchema, mergeRecords, settleConflict, settleSaved, } from "./apply";
 import { beginFirstSync, deleteMeta, getMeta, setMeta } from "./install";
 const WRITE_POLL_MS = 2_000;
 /** States that need something to change (the user, the account, an app update) before sync runs again. */
@@ -154,6 +154,8 @@ export function createEngineSyncWith(db, config, engine, env = {}) {
                     await emit("syncing");
                 return;
             case "didSync":
+                if (event.fetched)
+                    await endFresh(db);
                 if (status.state === "idle" || status.state === "syncing" || status.state === "error") {
                     await setMeta(db, "last_synced_at", String((env.now ?? Date.now)()));
                     await emit("idle");

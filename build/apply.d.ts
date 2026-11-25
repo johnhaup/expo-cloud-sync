@@ -26,6 +26,8 @@ export declare function accountGate(db: SQLiteDatabase, account: Account): Promi
 export declare function holdForNewerSchema(ctx: Context, records: SyncRecord[]): Promise<boolean>;
 /** Runs `task` in an exclusive transaction with the triggers silenced and foreign keys checked at commit. */
 export declare function applying(db: SQLiteDatabase, task: (txn: SQLiteDatabase) => Promise<void>): Promise<void>;
+/** The first download finished: from now on the newer row wins, as everywhere else. */
+export declare const endFresh: (db: SQLiteDatabase) => Promise<import("expo-sqlite").SQLiteRunResult>;
 /** Merges fetched records (parents first) inside an `applying` transaction. */
 export declare function mergeRecords(ctx: Context, txn: SQLiteDatabase, records: SyncRecord[]): Promise<void>;
 /** A save went through: keep its change tag; the row stops being dirty unless it was edited again while in flight. */

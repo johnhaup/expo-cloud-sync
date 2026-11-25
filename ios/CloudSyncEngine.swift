@@ -209,7 +209,11 @@ final class CloudSyncEngineHost: CKSyncEngineDelegate, @unchecked Sendable {
     case .willFetchChanges, .willSendChanges:
       emit(["type": "willSync"])
 
-    case .didFetchChanges, .didSendChanges:
+    case .didFetchChanges:
+      // `fetched` ends a new install's first download (JS: `endFresh`).
+      emit(["type": "didSync", "fetched": true])
+
+    case .didSendChanges:
       emit(["type": "didSync"])
 
     default:

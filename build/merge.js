@@ -10,10 +10,14 @@ export function payloadOf(row) {
  * - No local row: apply.
  * - The newer stamp wins. "keep" means the local row must be pushed (the caller keeps it dirty).
  * - Equal stamps: equal payloads are the same; otherwise the greater payload string wins, so both sides pick the same one.
+ * - `fresh` (a new install before its first download finished): the remote record always wins. Otherwise a
+ *   setting changed in the first seconds after a reinstall would push the install's defaults over the cloud copy.
  */
-export function decide(local, remote) {
+export function decide(local, remote, fresh = false) {
     if (!local)
         return "apply";
+    if (fresh)
+        return remote.payload === local.payload && remote.updatedAt === local.updatedAt ? "same" : "apply";
     if (remote.updatedAt !== local.updatedAt)
         return remote.updatedAt > local.updatedAt ? "apply" : "keep";
     if (remote.payload === local.payload)

@@ -118,4 +118,20 @@ describe("restore detection", () => {
     expect(await db.getAllAsync("SELECT * FROM _sync_rows")).toEqual([]);
     expect(await dirty(db)).toEqual(["folders/f1"]);
   });
+
+  test("only a database that never synced is a new install", async () => {
+    const db = openTestDatabase(new Database(":memory:"));
+    await db.execAsync(SCHEMA);
+    await installSyncWith(db, CONFIG, "phone-1");
+    expect(await getMeta(db, "fresh")).toBe("1");
+
+    // The first download ends it; the next launch does not bring it back.
+    await db.runAsync("DELETE FROM _sync_meta WHERE key = 'fresh'");
+    await installSyncWith(db, CONFIG, "phone-1");
+    expect(await getMeta(db, "fresh")).toBeNull();
+
+    // A restore carries another install's id: a first sync, but the newer row still wins.
+    await installSyncWith(db, CONFIG, "phone-2");
+    expect(await getMeta(db, "fresh")).toBeNull();
+  });
 });

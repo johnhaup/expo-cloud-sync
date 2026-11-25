@@ -394,3 +394,72 @@ describe("CloudSync", () => {
     expect(await syncA.signIn()).toBe(false);
   });
 });
+
+const setting = (device: Device, key: string) =>
+  device.db.getFirstAsync<{ value: string }>("SELECT value FROM settings WHERE key = ?", key).then((row) => row?.value);
+const putSetting = (device: Device, key: string, value: string, at: number) =>
+  device.db.runAsync(
+    "INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
+    key,
+    value,
+    at,
+  );
+const cloudSetting = (cloud: MemoryCloud, key: string) =>
+  cloud.records().find((record) => record.table === "settings" && record.id === key)?.payload;
+
+describe("a new install (HAU-792)", () => {
+  test("a setting written before the first download does not replace the cloud copy", async () => {
+    const cloud = createMemoryCloud();
+    const a = await openDevice("device-a");
+    await putSetting(a, "plates", "kg, no 25s", 10);
+    await sync(a, cloud);
+
+    // Reinstall: the app writes its defaults (a tip closed, a switch flipped) before sync has run once.
+    const b = await openDevice("device-b", CONFIG, { fresh: true });
+    await putSetting(b, "plates", "defaults", 1_000);
+    await addFolder(b.db, "f2", "made on b", 1_000);
+    expect((await sync(b, cloud)).state).toBe("idle");
+
+    expect(await setting(b, "plates")).toBe("kg, no 25s");
+    expect(cloudSetting(cloud, "plates")).toContain("kg, no 25s");
+    // Rows the cloud does not have still go up.
+    expect(cloud.records().some((record) => record.id === "f2")).toBe(true);
+    expect(await getMeta(b.db, "fresh")).toBeNull();
+
+    // After the first download the newer edit wins again.
+    await putSetting(b, "plates", "lbs", 2_000);
+    await sync(b, cloud);
+    expect(cloudSetting(cloud, "plates")).toContain("lbs");
+  });
+
+  test("with an empty cloud the new install's rows go up", async () => {
+    const cloud = createMemoryCloud();
+    const b = await openDevice("device-b", CONFIG, { fresh: true });
+    await putSetting(b, "plates", "mine", 5);
+    expect((await sync(b, cloud)).state).toBe("idle");
+    expect(cloudSetting(cloud, "plates")).toContain("mine");
+    expect(await getMeta(b.db, "fresh")).toBeNull();
+  });
+
+  test("a pull that fails keeps the install new", async () => {
+    const cloud = createMemoryCloud();
+    const b = await openDevice("device-b", CONFIG, { fresh: true });
+    const failing: Transport = { ...memoryTransport(cloud), pull: async () => Promise.reject(new Error("offline")) };
+    expect((await runCycle(b.db, CONFIG, failing)).state).toBe("error");
+    expect(await getMeta(b.db, "fresh")).toBe("1");
+  });
+
+  test("a restored database keeps the newer-row rule, so the restore wins", async () => {
+    const cloud = createMemoryCloud();
+    const a = await openDevice("device-a");
+    await putSetting(a, "plates", "before the restore", 10);
+    await sync(a, cloud);
+
+    const phone = await openDevice("phone-1");
+    await putSetting(phone, "plates", "restored", 50);
+    await installSyncWith(phone.db, CONFIG, "phone-2");
+    await sync(phone, cloud);
+    expect(await setting(phone, "plates")).toBe("restored");
+    expect(cloudSetting(cloud, "plates")).toContain("restored");
+  });
+});

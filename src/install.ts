@@ -19,7 +19,7 @@ const literal = (value: string) => `'${value.replaceAll("'", "''")}'`;
 export const notExcluded = (table: Table, column: string) =>
   table.excludeKeys.length ? `${column} NOT IN (${table.excludeKeys.map(literal).join(", ")})` : "1";
 
-export type MetaKey = "applying" | "enabled" | "device_id" | "account_id" | "cursor" | "last_synced_at" | "hold";
+export type MetaKey = "applying" | "enabled" | "device_id" | "account_id" | "cursor" | "last_synced_at" | "hold" | "fresh";
 
 export const getMeta = async (db: SQLiteDatabase, key: MetaKey) =>
   (await db.getFirstAsync<{ value: string }>("SELECT value FROM _sync_meta WHERE key = ?", key))?.value ?? null;
@@ -118,7 +118,12 @@ export async function installSyncWith(db: SQLiteDatabase, config: SyncConfig, de
     for (const { name } of old) await db.execAsync(`DROP TRIGGER ${quote(name)}`);
     for (const table of tables) for (const sql of triggersFor(table)) await db.execAsync(sql);
 
-    if ((await getMeta(db, "device_id")) !== deviceId) {
+    const storedId = await getMeta(db, "device_id");
+    if (storedId !== deviceId) {
+      // No id at all: this database never synced (a new install or a reinstall). Until its first download
+      // finishes, the cloud's rows win over what this install wrote (see `decide`). A restore carries
+      // another install's id and keeps the normal rule, so restored data still wins when newer.
+      if (storedId === null) await setMeta(db, "fresh", "1");
       await setMeta(db, "device_id", deviceId);
       await beginFirstSync(db, config);
     }

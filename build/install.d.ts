@@ -11,7 +11,7 @@ export declare const resolveTable: (table: SyncTable) => Table;
 export declare const quote: (name: string) => string;
 /** SQL condition on `column` that leaves out the table's excluded keys ("1" when there are none). */
 export declare const notExcluded: (table: Table, column: string) => string;
-export type MetaKey = "applying" | "enabled" | "device_id" | "account_id" | "cursor" | "last_synced_at" | "hold";
+export type MetaKey = "applying" | "enabled" | "device_id" | "account_id" | "cursor" | "last_synced_at" | "hold" | "fresh";
 export declare const getMeta: (db: SQLiteDatabase, key: MetaKey) => Promise<string | null>;
 export declare const setMeta: (db: SQLiteDatabase, key: MetaKey, value: string) => Promise<import("expo-sqlite").SQLiteRunResult>;
 export declare const deleteMeta: (db: SQLiteDatabase, key: MetaKey) => Promise<import("expo-sqlite").SQLiteRunResult>;

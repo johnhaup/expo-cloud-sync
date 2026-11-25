@@ -1,4 +1,4 @@
-import { accountGate, applying, createContext, dirtyRecords, gate, holdForNewerSchema, mergeRecords, settleConflict, settleSaved, } from "./apply";
+import { accountGate, applying, createContext, dirtyRecords, endFresh, gate, holdForNewerSchema, mergeRecords, settleConflict, settleSaved, } from "./apply";
 import { beginFirstSync, getMeta, setMeta } from "./install";
 export const PUSH_BATCH = 200;
 const PUSH_ROUNDS = 3;
@@ -93,6 +93,7 @@ export async function runCycle(db, config, transport, options = {}) {
         const pulled = await pull(ctx, transport);
         if (pulled)
             return result(pulled, account);
+        await endFresh(db);
         const pushed = options.pushPaused ? { state: "quotaExceeded" } : await push(ctx, transport, (await getMeta(db, "device_id")) ?? "");
         if (pushed)
             return result(pushed, account);
