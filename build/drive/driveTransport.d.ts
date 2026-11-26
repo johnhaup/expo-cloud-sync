@@ -17,6 +17,8 @@ export type DriveTransportOptions = DriveApiOptions & {
 };
 /** A delta above this many rows, or above a fifth of all of this device's rows, is folded into the base. */
 export declare const COMPACT_ROWS = 200;
+/** How long sign out waits for Google to revoke the grant before going on without it. */
+export declare const REVOKE_WAIT_MS = 5000;
 export declare const FILE_FORMAT = 1;
 type Kind = "base" | "delta";
 export type DriveFileBody = {

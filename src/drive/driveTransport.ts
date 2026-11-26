@@ -19,6 +19,8 @@ export type DriveTransportOptions = DriveApiOptions & {
 
 /** A delta above this many rows, or above a fifth of all of this device's rows, is folded into the base. */
 export const COMPACT_ROWS = 200;
+/** How long sign out waits for Google to revoke the grant before going on without it. */
+export const REVOKE_WAIT_MS = 5_000;
 export const FILE_FORMAT = 1;
 
 type Kind = "base" | "delta";
@@ -43,6 +45,7 @@ const parseCursor = (cursor: string | null): Cursor => (cursor ? (JSON.parse(cur
 
 export function driveTransport(options: DriveTransportOptions): Transport {
   const { app, now = Date.now } = options;
+  const wait = options.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const api = driveApi(options);
   let known: { token: string; account: Account } | undefined;
   let own: Own | undefined;
@@ -196,7 +199,9 @@ export function driveTransport(options: DriveTransportOptions): Transport {
       own = undefined;
       known = undefined;
       api.forget();
-      if (email) await options.auth.revoke(email);
+      // Best effort: on older Play services (24.23 on the API 35 emulator) revokeAccess never completes, and where it
+      // does Google may keep the grant anyway. Signed out is the device's own `signed_out` flag, set before this.
+      if (email) await Promise.race([options.auth.revoke(email).catch(() => undefined), wait(REVOKE_WAIT_MS)]);
     },
   };
 }

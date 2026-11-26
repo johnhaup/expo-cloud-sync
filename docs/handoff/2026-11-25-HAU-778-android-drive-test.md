@@ -14,21 +14,25 @@ copy, deleted after; the app was uninstalled again.
 - **Delete synced copy**: after "Sign out and delete synced copy", `pm clear` and sign in show "No notes yet.", so
   appDataFolder was emptied.
 
-## Failed: Sign out does not sign out
+## Failed, then fixed in v0.4.2: Sign out did not sign out
 
-Tapping **Sign out** (twice, and also "Sign out and delete synced copy") leaves the app `idle` and "Syncing as
-haupenbusiness@gmail.com": signOut's own `syncNow()` ran (Last synced moved) and the silent `authorize(false)` still got
-a token. After the wipe, sign-in went straight from the account picker to signed in with no consent screen, so the
-`drive.appdata` grant survived `revokeAccess`. Nothing in logcat (release build; no exception from GMS logged).
-Disproves the M5 assumption "silent `authorize` needs a resolution after `revokeAccess`".
+Tapping **Sign out** left the app `idle` and "Syncing as haupenbusiness@gmail.com". Cause, found with logging in a
+scratch copy: `revokeAccess(...)` never completes on this emulator's Play services (24.23.35, mid-2024; neither
+success nor failure after 20 s), so `signOut()` hung before it changed anything. "Delete synced copy" still worked
+because `wipe()` runs before the revoke. Google also kept the grant: after a wipe, sign-in skipped the consent screen.
 
-Consequence: on Android a user can't stop syncing by signing out, and after "delete synced copy" the device keeps
-syncing (its own rows are not re-uploaded, because signOut clears `_sync_rows` and the cursor, so it diverges from
-the cloud until a row changes).
+Fix (`9f1df55`, then the commit tagged `v0.4.2`): signed out is the device's own `_sync_meta.signed_out`, set before the
+revoke; the cycle reports `signedOut` while it is set and `signIn()` clears it. The revoke is best effort, capped at
+`REVOKE_WAIT_MS` (5 s). The fake Drive's revoke now keeps the grant, and `revokeHangs` reproduces the hang; two new
+tests. On the device: Sign out returns after 5.0 s, `signedOut`, still `signedOut` after a relaunch, and Sign in syncs
+again.
 
-Next: check whether `revokeAccess(...).await()` throws or returns (log it in a debug build); if it returns and the
-grant stays, keep a local signed-out flag (`_sync_meta`) that `account()` honours until the user signs in again,
-rather than relying on Google to refuse the silent token. Add a bun test for "signed out stays signed out".
+## Watch out for
+
+- **The example app bundles `../src`, not `build/`** (`example/tsconfig.json` paths, which Expo's Metro honours). A
+  scratch copy on the worker needs the current `src/`; copying only `build/` tests the old code.
+- The worker's shell is zsh: `$CMD args` in a variable does not word-split; use a function.
+- The emulator's Play services lag real phones. Anything Google-side the module waits on needs a timeout.
 
 ## Not run
 

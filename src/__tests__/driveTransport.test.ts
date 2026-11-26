@@ -5,7 +5,7 @@ import { createCloudSyncWith } from "../cloudSync";
 import { runCycle } from "../cycle";
 import { getMeta, installSyncWith } from "../install";
 import { openTestDatabase } from "../testing/testDatabase";
-import { COMPACT_ROWS, driveTransport, fileName, type DriveFileBody } from "../drive/driveTransport";
+import { COMPACT_ROWS, driveTransport, fileName, REVOKE_WAIT_MS, type DriveFileBody } from "../drive/driveTransport";
 import type { Transport } from "../types";
 import { createFakeDrive, type FakeDrive } from "./fakeDrive";
 import { addFolder, addNote, CONFIG, dirty, editNote, openDevice, type Device } from "./fixtures";
@@ -310,6 +310,17 @@ describe("drive transport", () => {
     expect(await relaunched.signIn()).toBe(true);
     expect(relaunched.getStatus().state).toBe("idle");
     expect(uploaded()).toContain("notes/n2");
+  });
+
+  test("sign out finishes when Google's revoke never answers (HAU-778)", async () => {
+    const { drive, a } = await twoDevices();
+    drive.revokeHangs = true;
+    const syncA = createCloudSyncWith(a.db, CONFIG, a.transport);
+    expect((await syncA.syncNow()).state).toBe("idle");
+    await syncA.signOut({ deleteCloudCopy: false });
+    expect(drive.revoked).toEqual(["test@example.com"]);
+    expect(drive.slept).toContain(REVOKE_WAIT_MS);
+    expect(syncA.getStatus().state).toBe("signedOut");
   });
 
   test("not signed in: signedOut until the user grants access", async () => {

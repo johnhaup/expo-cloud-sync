@@ -34,6 +34,8 @@ export function createFakeDrive() {
     slept: [] as number[],
     revoked: [] as string[],
     cleared: [] as string[],
+    /** revokeAccess never completes while set, as on Play services 24.23 (HAU-778). */
+    revokeHangs: false,
   };
 
   return Object.assign(drive, {
@@ -60,8 +62,9 @@ export function createFakeDrive() {
         }
       },
       // As on a real device (HAU-778): revoking leaves the grant in place, and silent requests still get a token.
-      revoke: async (email: string) => {
+      revoke: (email: string) => {
         drive.revoked.push(email);
+        return drive.revokeHangs ? new Promise<void>(() => undefined) : Promise.resolve();
       },
     } satisfies DriveAuth,
     sleep: async (ms: number) => void drive.slept.push(ms),
