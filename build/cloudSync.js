@@ -135,8 +135,10 @@ export function createCloudSyncWith(db, config, transport, env = {}) {
             if (!transport)
                 return false;
             const signedIn = transport.signIn ? await transport.signIn() : (await transport.account()).state === "available";
-            if (signedIn)
+            if (signedIn) {
+                await deleteMeta(db, "signed_out");
                 await sync.setEnabled(true);
+            }
             return signedIn;
         },
         async signOut({ deleteCloudCopy }) {
@@ -150,6 +152,7 @@ export function createCloudSyncWith(db, config, transport, env = {}) {
             await db.withTransactionAsync(async () => {
                 await deleteMeta(db, "cursor");
                 await db.runAsync("DELETE FROM _sync_rows");
+                await setMeta(db, "signed_out", "1");
             });
             await syncNow();
         },

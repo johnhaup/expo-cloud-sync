@@ -59,9 +59,9 @@ export function createFakeDrive() {
           drive.valid.add(drive.current);
         }
       },
+      // As on a real device (HAU-778): revoking leaves the grant in place, and silent requests still get a token.
       revoke: async (email: string) => {
         drive.revoked.push(email);
-        drive.granted = false;
       },
     } satisfies DriveAuth,
     sleep: async (ms: number) => void drive.slept.push(ms),

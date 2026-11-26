@@ -19,7 +19,7 @@ const literal = (value: string) => `'${value.replaceAll("'", "''")}'`;
 export const notExcluded = (table: Table, column: string) =>
   table.excludeKeys.length ? `${column} NOT IN (${table.excludeKeys.map(literal).join(", ")})` : "1";
 
-export type MetaKey = "applying" | "enabled" | "device_id" | "account_id" | "cursor" | "last_synced_at" | "hold" | "fresh";
+export type MetaKey = "applying" | "enabled" | "device_id" | "account_id" | "cursor" | "last_synced_at" | "hold" | "fresh" | "signed_out";
 
 export const getMeta = async (db: SQLiteDatabase, key: MetaKey) =>
   (await db.getFirstAsync<{ value: string }>("SELECT value FROM _sync_meta WHERE key = ?", key))?.value ?? null;

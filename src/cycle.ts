@@ -113,6 +113,8 @@ export async function runCycle(
 
   const gated = await gate(db, config);
   if (gated) return result({ state: gated });
+  // Google keeps the grant after `revokeAccess` and hands out tokens silently, so signed out is this device's own state.
+  if ((await getMeta(db, "signed_out")) === "1") return result({ state: "signedOut" });
 
   let account: Account | undefined;
   try {

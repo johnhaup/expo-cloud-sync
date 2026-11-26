@@ -293,6 +293,25 @@ describe("drive transport", () => {
     expect(await notes(b)).toEqual(["n1:mine"]);
   });
 
+  test("signed out stays signed out across a relaunch, though Google still hands out tokens (HAU-778)", async () => {
+    const { drive, a } = await twoDevices();
+    await addNote(a.db, "n1", "mine", 10);
+    const before = createCloudSyncWith(a.db, CONFIG, a.transport);
+    expect((await before.syncNow()).state).toBe("idle");
+    await before.signOut({ deleteCloudCopy: false });
+    expect(drive.granted).toBe(true);
+
+    const relaunched = createCloudSyncWith(a.db, CONFIG, a.transport);
+    await addNote(a.db, "n2", "offline", 20);
+    expect((await relaunched.syncNow()).state).toBe("signedOut");
+    const uploaded = () => [...(ids(fileBody(drive, "device-a", "base")) ?? []), ...(ids(fileBody(drive, "device-a", "delta")) ?? [])];
+    expect(uploaded()).not.toContain("notes/n2");
+
+    expect(await relaunched.signIn()).toBe(true);
+    expect(relaunched.getStatus().state).toBe("idle");
+    expect(uploaded()).toContain("notes/n2");
+  });
+
   test("not signed in: signedOut until the user grants access", async () => {
     const drive = createFakeDrive();
     drive.granted = false;
